@@ -1,5 +1,9 @@
 import React from 'react';
 import ImageGrid from './ImageGrid';
+// index.js or App.js
+import './index.css'; // Adjust the path as necessary
+
+
 
 function App() {
   return (
