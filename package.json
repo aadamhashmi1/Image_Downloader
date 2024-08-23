@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.7.4",
     "compromise": "^14.14.0",
+    "cors": "^2.8.5",
     "fabric": "^6.3.0",
     "openai": "^4.56.0",
     "react": "^16.14.0",

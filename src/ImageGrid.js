@@ -4,32 +4,43 @@ import Lightbox from 'react-image-lightbox';
 import 'react-image-lightbox/style.css';
 import { searchImages } from './pexelsService';
 import { getRandomQuote } from './quotesService';
-import { analyzeQuote } from './textAnalyticsService';
+import { summarizeQuote } from './chatGPTService';
 
 const ImageGrid = () => {
   const [images, setImages] = useState([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(''); // Initialize with an empty string
   const [isOpen, setIsOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [quote, setQuote] = useState({ content: '', author: '' });
+  const [error, setError] = useState('');
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    const photos = await searchImages(query);
-    setImages(photos);
+    try {
+      const photos = await searchImages(query);
+      setImages(photos);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching images:', err);
+      setError('Failed to fetch images.');
+    }
   };
 
   const fetchQuote = async () => {
-    const randomQuote = await getRandomQuote();
-    console.log('Fetched Quote:', randomQuote);
-    setQuote(randomQuote);
+    try {
+      const randomQuote = await getRandomQuote();
+      setQuote(randomQuote);
 
-    // Analyze the quote and fetch images based on the keyword
-    const keyword = await analyzeQuote(randomQuote.content);
-    console.log('Analyzed Keyword:', keyword);
-    setQuery(keyword);  // Set the query to the analyzed keyword
-    const photos = await searchImages(keyword);  // Fetch images based on the keyword
-    setImages(photos);
+      const keyword = await summarizeQuote(randomQuote.content);
+      setQuery(keyword);
+
+      const photos = await searchImages(keyword);
+      setImages(photos);
+      setError('');
+    } catch (err) {
+      console.error('Error summarizing quote or fetching images:', err);
+      setError('Failed to fetch images from summarized keyword.');
+    }
   };
 
   const openLightbox = (index) => {
@@ -52,6 +63,7 @@ const ImageGrid = () => {
   const downloadImage = async (url, filename) => {
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error('Network response was not ok');
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -70,7 +82,7 @@ const ImageGrid = () => {
     default: 4,
     1100: 3,
     700: 2,
-    500: 1
+    500: 1,
   };
 
   return (
@@ -78,7 +90,7 @@ const ImageGrid = () => {
       <form onSubmit={handleSearch} className="mb-4 flex items-center">
         <input
           type="text"
-          value={query}
+          value={query} // Controlled input
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for images..."
           className="border p-2 rounded w-full"
@@ -94,6 +106,12 @@ const ImageGrid = () => {
           Get Random Quote
         </button>
       </form>
+
+      {error && (
+        <div className="mb-4 border p-4 rounded bg-red-100 text-red-600">
+          {error}
+        </div>
+      )}
 
       {quote.content && (
         <div className="mb-4 border p-4 rounded bg-gray-100">
@@ -118,7 +136,7 @@ const ImageGrid = () => {
         ))}
       </Masonry>
 
-      {isOpen && (
+      {isOpen && images.length > 0 && (
         <Lightbox
           mainSrc={images[currentIndex].src.large}
           nextSrc={images[(currentIndex + 1) % images.length].src.large}
