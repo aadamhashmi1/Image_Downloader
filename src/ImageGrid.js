@@ -18,13 +18,7 @@ const ImageGrid = () => {
   const [quote, setQuote] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [preparedImages, setPreparedImages] = useState([]);
-
-  useEffect(() => {
-    if (images.length > 0) {
-      prepareImagesWithText();
-    }
-  }, [images]);
+  const [preparedImage, setPreparedImage] = useState(null);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -58,66 +52,25 @@ const ImageGrid = () => {
     }
   };
 
-  const prepareImagesWithText = async () => {
-    const updatedImages = await Promise.all(images.map(async (image) => {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      const img = new Image();
-      img.crossOrigin = 'Anonymous'; // Handle CORS if needed
-
-      const imageBrightness = await calculateImageBrightness(image);
-
-      return new Promise((resolve) => {
-        img.onload = async () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          context.drawImage(img, 0, 0);
-
-          // Define text properties
-          let fontSize = Math.max(canvas.width / 20, 20); // Set minimum font size
-          let font = `bold ${fontSize}px Futura, Arial`;
-
-          context.font = font;
-          context.fillStyle = getTextColor(imageBrightness);
-          context.textAlign = 'center';
-          context.textBaseline = 'middle';
-
-          const text = `"${query.toUpperCase()}"`;
-          const textLines = wrapText(context, text, canvas.width * 0.9); // 90% of image width
-          const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
-
-          textLines.forEach((line, index) => {
-            context.fillText(line, canvas.width / 2, textPosition.y + (index * (fontSize + 10))); // Adjust line height
-          });
-
-          canvas.toBlob((blob) => {
-            const blobUrl = URL.createObjectURL(blob);
-            resolve({ ...image, src: blobUrl });
-          }, 'image/jpeg');
-        };
-
-        img.src = image.src.medium;
-      });
-    }));
-
-    setPreparedImages(updatedImages);
-  };
-
-  const openLightbox = (index) => {
+  const openLightbox = async (index) => {
     setCurrentIndex(index);
     setIsOpen(true);
+    await prepareImageWithText(images[index]); // Prepare the image with text
   };
 
   const closeLightbox = () => {
     setIsOpen(false);
+    setPreparedImage(null); // Clear prepared image on close
   };
 
   const moveToNext = () => {
-    setCurrentIndex((currentIndex + 1) % preparedImages.length);
+    setCurrentIndex((currentIndex + 1) % images.length);
+    prepareImageWithText(images[(currentIndex + 1) % images.length]);
   };
 
   const moveToPrev = () => {
-    setCurrentIndex((currentIndex + preparedImages.length - 1) % preparedImages.length);
+    setCurrentIndex((currentIndex + images.length - 1) % images.length);
+    prepareImageWithText(images[(currentIndex + images.length - 1) % images.length]);
   };
 
   const wrapText = (context, text, maxWidth) => {
@@ -142,52 +95,58 @@ const ImageGrid = () => {
     return lines;
   };
 
-  const downloadImage = async (url, filename) => {
-    try {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      const img = new Image();
-      img.crossOrigin = 'Anonymous'; // Handle CORS if needed
+  const getTextColor = (brightness) => {
+    return brightness < 128 ? 'white' : 'black';
+  };
 
+  const getTextPosition = (width, height, numberOfLines) => {
+    return {
+      x: width / 2,
+      y: height / 2 - (numberOfLines * 20) / 2 // Center text vertically, adjusting for number of lines
+    };
+  };
+
+  const prepareImageWithText = async (image) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // Handle CORS if needed
+
+    const imageBrightness = await calculateImageBrightness(image);
+
+    return new Promise((resolve) => {
       img.onload = async () => {
         canvas.width = img.width;
         canvas.height = img.height;
         context.drawImage(img, 0, 0);
 
-        // Add text overlay
-        const imageBrightness = await calculateImageBrightness(img);
-        const textColor = getTextColor(imageBrightness);
-        const textPosition = getTextPosition(canvas.width, canvas.height, 1); // Assume 1 line of text
+        // Define text properties
+        let fontSize = Math.max(canvas.width / 20, 20); // Set minimum font size
+        let font = `bold ${fontSize}px Futura, Arial`;
 
-        context.font = 'bold 36px Futura, Arial'; // Use Futura font or fallback
-        context.fillStyle = textColor;
+        context.font = font;
+        context.fillStyle = getTextColor(imageBrightness);
         context.textAlign = 'center';
         context.textBaseline = 'middle';
 
-        const formattedText = `"${query.toUpperCase()}"`;
-        context.fillText(formattedText, textPosition.x, textPosition.y);
+        const text = `"${quote.toUpperCase()}"`;
+        const textLines = wrapText(context, text, canvas.width * 0.9); // 90% of image width
+        const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
+
+        textLines.forEach((line, index) => {
+          context.fillText(line, canvas.width / 2, textPosition.y + (index * (fontSize + 10))); // Adjust line height
+        });
 
         canvas.toBlob((blob) => {
-          if (!blob) {
-            console.error('Failed to create blob');
-            return;
-          }
-
           const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(blobUrl);
+          resolve(blobUrl);
         }, 'image/jpeg');
       };
 
-      img.src = url;
-    } catch (error) {
-      console.error('Error downloading image:', error);
-    }
+      img.src = image.src.medium;
+    }).then((blobUrl) => {
+      setPreparedImage(blobUrl);
+    });
   };
 
   const calculateImageBrightness = (image) => {
@@ -224,17 +183,6 @@ const ImageGrid = () => {
     });
   };
 
-  const getTextColor = (brightness) => {
-    return brightness < 128 ? 'white' : 'black';
-  };
-
-  const getTextPosition = (width, height, numberOfLines) => {
-    return {
-      x: width / 2,
-      y: height / 2 - (numberOfLines * 20) / 2 // Center text vertically, adjusting for number of lines
-    };
-  };
-
   return (
     <div>
       <form onSubmit={handleSearch}>
@@ -252,24 +200,23 @@ const ImageGrid = () => {
         className="my-masonry-grid"
         columnClassName="my-masonry-grid_column"
       >
-        {preparedImages.map((image, index) => (
+        {images.map((image, index) => (
           <div key={index} className="image-container">
             <img
-              src={image.src}
+              src={image.src.medium}
               alt={`img-${index}`}
               onClick={() => openLightbox(index)}
               style={{ cursor: 'pointer' }}
             />
-            <button onClick={() => downloadImage(image.src, `image-${index}.jpg`)}>Download</button>
           </div>
         ))}
       </Masonry>
 
       {isOpen && (
         <Lightbox
-          mainSrc={preparedImages[currentIndex].src}
-          nextSrc={preparedImages[(currentIndex + 1) % preparedImages.length].src}
-          prevSrc={preparedImages[(currentIndex + preparedImages.length - 1) % preparedImages.length].src}
+          mainSrc={preparedImage || images[currentIndex].src.medium}
+          nextSrc={images[(currentIndex + 1) % images.length].src.medium}
+          prevSrc={images[(currentIndex + images.length - 1) % images.length].src.medium}
           onCloseRequest={closeLightbox}
           onMovePrevRequest={moveToPrev}
           onMoveNextRequest={moveToNext}
