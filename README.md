@@ -18,7 +18,7 @@ This React application allows users to search for images, generate random quotes
 
 
 ### Interactive Text Handles
-![Interactive Text Handles](screenshots/text-handles.png)
+![Interactive Text Handles](screenshots/handle.png)
 
 
 ## Installation

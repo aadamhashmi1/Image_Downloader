@@ -51,8 +51,8 @@ const ImageGrid = () => {
                   border: 1px solid #000; 
                   cursor: pointer; 
                 }
-                .handle-tl { top: 10px; left: 10px; cursor: nw-resize; }
-                .handle-tr { top: 10px; right: 10px; cursor: ne-resize; }
+                .handle-tl { top: 4px; left: 4px; cursor: nw-resize; }
+                .handle-tr { top: 4px; right: 4px; cursor: ne-resize; }
                 .handle-bl { bottom: 10px; left: 10px; cursor: sw-resize; }
                 .handle-br { bottom: 10px; right: 10px; cursor: se-resize; }
                 .download-btn, .color-btn { 
@@ -71,10 +71,10 @@ const ImageGrid = () => {
             <body>
               <div class="canvas-container">
                 <canvas id="imageCanvas"></canvas>
-                <div id="handle-tl" class="handle"></div>
-                <div id="handle-tr" class="handle"></div>
-                <div id="handle-bl" class="handle"></div>
-                <div id="handle-br" class="handle"></div>
+                <div id="handle-tl" class="handle handle-tl"></div>
+                <div id="handle-tr" class="handle handle-tr"></div>
+                <div id="handle-bl" class="handle handle-bl"></div>
+                <div id="handle-br" class="handle handle-br"></div>
               </div>
               <button class="download-btn" onclick="downloadImage()">Download</button>
               <button class="color-btn" onclick="changeTextColor()">Change Text Color</button>
@@ -92,58 +92,57 @@ const ImageGrid = () => {
                 const textHandleTr = document.getElementById('handle-tr');
                 const textHandleBl = document.getElementById('handle-bl');
                 const textHandleBr = document.getElementById('handle-br');
-      
+                
                 img.onload = () => {
                   canvas.width = img.width;
                   canvas.height = img.height;
                   drawText();
                 };
-      
+  
                 function drawText() {
                   context.clearRect(0, 0, canvas.width, canvas.height);
                   context.drawImage(img, 0, 0);
-      
+  
                   const font = \`bold \${fontSize}px Futura, Arial\`;
                   context.font = font;
                   context.fillStyle = textColor;
                   context.textAlign = 'center';
                   context.textBaseline = 'middle';
-      
+  
                   const text = '"${quote.toUpperCase()}"';
                   const textLines = wrapText(context, text, canvas.width * 0.9);
                   const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
-      
+  
                   textLines.forEach((line, index) => {
                     context.fillText(line, textX, textY + (index * (fontSize + 10)));
                   });
-      
-                  // Update handle positions
+  
                   updateHandles(textPosition, textLines.length, fontSize);
                 }
-      
+  
                 function updateHandles(textPosition, numberOfLines, fontSize) {
                   const textBoxWidth = canvas.width * 0.9;
                   const textBoxHeight = (fontSize + 10) * numberOfLines;
-      
+  
                   textHandleTl.style.top = \`\${textPosition.y - textBoxHeight / 2}px\`;
                   textHandleTl.style.left = \`\${textPosition.x - textBoxWidth / 2}px\`;
-      
+  
                   textHandleTr.style.top = \`\${textPosition.y - textBoxHeight / 2}px\`;
                   textHandleTr.style.left = \`\${textPosition.x + textBoxWidth / 2 - 20}px\`;
-      
+  
                   textHandleBl.style.top = \`\${textPosition.y + textBoxHeight / 2 - 20}px\`;
                   textHandleBl.style.left = \`\${textPosition.x - textBoxWidth / 2}px\`;
-      
+  
                   textHandleBr.style.top = \`\${textPosition.y + textBoxHeight / 2 - 20}px\`;
                   textHandleBr.style.left = \`\${textPosition.x + textBoxWidth / 2 - 20}px\`;
                 }
-      
+  
                 function changeTextColor() {
                   const colors = ['white', 'black', 'red', 'blue', 'green'];
                   textColor = colors[Math.floor(Math.random() * colors.length)];
                   drawText();
                 }
-      
+  
                 function downloadImage() {
                   const dataURL = canvas.toDataURL('image/png');
                   const a = document.createElement('a');
@@ -151,17 +150,17 @@ const ImageGrid = () => {
                   a.download = 'image.png';
                   a.click();
                 }
-      
+  
                 function wrapText(context, text, maxWidth) {
                   const words = text.split(' ');
                   let line = '';
                   const lines = [];
-      
+  
                   for (let i = 0; i < words.length; i++) {
                     const testLine = line + words[i] + ' ';
                     const metrics = context.measureText(testLine);
                     const testWidth = metrics.width;
-      
+  
                     if (testWidth > maxWidth && i > 0) {
                       lines.push(line);
                       line = words[i] + ' ';
@@ -170,65 +169,50 @@ const ImageGrid = () => {
                     }
                   }
                   lines.push(line);
-      
+  
                   return lines;
                 }
-      
+  
                 function getTextPosition(width, height, numberOfLines) {
                   return {
                     x: width / 2,
                     y: height / 2 - (numberOfLines * 20) / 2
                   };
                 }
-      
-                function onMouseMove(e, handle) {
-  const sensitivity = 0.05; // Adjust this factor to control sensitivity
-  const rect = canvas.getBoundingClientRect();
   
-  let newWidth, newHeight;
-  let xOffset = e.clientX - rect.left;
-  let yOffset = e.clientY - rect.top;
-
-  if (handle === 'tl') {
-    newWidth = canvas.width - (xOffset - textX) * sensitivity;
-    newHeight = canvas.height - (yOffset - textY) * sensitivity;
-    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
-    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
-    textX = xOffset + (canvas.width / 2);
-    textY = yOffset + (canvas.height / 2);
-  } else if (handle === 'tr') {
-    newWidth = (xOffset - textX) * sensitivity;
-    newHeight = canvas.height - (yOffset - textY) * sensitivity;
-    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
-    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
-    textY = yOffset + (canvas.height / 2);
-  } else if (handle === 'bl') {
-    newWidth = canvas.width - (xOffset - textX) * sensitivity;
-    newHeight = (yOffset - textY) * sensitivity;
-    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
-    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
-    textX = xOffset + (canvas.width / 2);
-  } else if (handle === 'br') {
-    newWidth = (xOffset - textX) * sensitivity;
-    newHeight = (yOffset - textY) * sensitivity;
-    canvas.width = Math.max(newWidth, 6); // Ensure minimum width
-    canvas.height = Math.max(newHeight, 6); // Ensure minimum height
-  }
-
-  drawText();
-}
-
-      
+                function onMouseMove(e, handle) {
+                  if (e.buttons === 1) {
+                    const rect = canvas.getBoundingClientRect();
+                    const handleOffset = 10; // Offset from handle to the text center
+                    
+                    if (handle === 'tl') {
+                      textX = e.clientX - rect.left + handleOffset;
+                      textY = e.clientY - rect.top + handleOffset;
+                    } else if (handle === 'tr') {
+                      textX = e.clientX - rect.left - handleOffset;
+                      textY = e.clientY - rect.top + handleOffset;
+                    } else if (handle === 'bl') {
+                      textX = e.clientX - rect.left + handleOffset;
+                      textY = e.clientY - rect.top - handleOffset;
+                    } else if (handle === 'br') {
+                      textX = e.clientX - rect.left - handleOffset;
+                      textY = e.clientY - rect.top - handleOffset;
+                    }
+  
+                    drawText();
+                  }
+                }
+  
                 function onHandleMouseDown(e, handle) {
                   document.addEventListener('mousemove', (moveEvent) => onMouseMove(moveEvent, handle));
                   document.addEventListener('mouseup', onHandleMouseUp);
                 }
-      
+  
                 function onHandleMouseUp() {
                   document.removeEventListener('mousemove', onMouseMove);
                   document.removeEventListener('mouseup', onHandleMouseUp);
                 }
-      
+  
                 textHandleTl.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'tl'));
                 textHandleTr.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'tr'));
                 textHandleBl.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'bl'));
@@ -237,7 +221,7 @@ const ImageGrid = () => {
             </body>
             </html>
           `);
-      
+  
           newWindow.document.close();
         } catch (error) {
           console.error('Error opening new window:', error);
@@ -248,6 +232,8 @@ const ImageGrid = () => {
     openImageInNewWindow();
   }, [preparedImage, quote]);
   
+  
+
   
   
   
