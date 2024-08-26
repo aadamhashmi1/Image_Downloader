@@ -1,8 +1,9 @@
+// src/ImageGrid.js
 import React, { useState, useRef, useEffect } from 'react';
 import Masonry from 'react-masonry-css';
 import { searchImages } from './pexelsService';
 import { fetchRandomQuote } from './quoteService';
-import { initializeCanvas } from './fabric'; // Import the initializeCanvas function
+import * as fabric from 'fabric';
 
 const breakpointColumnsObj = {
   default: 4,
@@ -15,18 +16,146 @@ const ImageGrid = () => {
   const [images, setImages] = useState([]);
   const [query, setQuery] = useState('');
   const [quote, setQuote] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(null);
-  const canvasRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [preparedImage, setPreparedImage] = useState(null);
 
   useEffect(() => {
-    if (currentIndex !== null && images[currentIndex]) {
-      const canvas = initializeCanvas(canvasRef.current, images[currentIndex].src.medium, quote);
-
-      return () => {
-        canvas.dispose();
-      };
-    }
-  }, [currentIndex, images, quote]);
+    const openImageInNewWindow = async () => {
+      if (preparedImage) {
+        try {
+          // Calculate the text color asynchronously
+          const imageBrightness = await calculateImageBrightness({ src: { medium: preparedImage } });
+          const textColor = getTextColor(imageBrightness);
+  
+          // Open a new window and check if it was successful
+          const newWindow = window.open('', '_blank');
+          if (!newWindow) {
+            console.error('Failed to open a new window. Please check your browser settings.');
+            return;
+          }
+  
+          // Write content to the new window
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>Image Viewer</title>
+                <style>
+                  body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
+                  .canvas-container { position: relative; }
+                  canvas { max-width: 100%; max-height: 100%; }
+                  .download-btn, .color-btn {
+                    position: fixed;
+                    top: 10px;
+                    background-color: #fff;
+                    padding: 5px 10px;
+                    border: none;
+                    cursor: pointer;
+                    z-index: 1;
+                  }
+                  .download-btn { right: 10px; }
+                  .color-btn { right: 120px; }
+                </style>
+              </head>
+              <body>
+                <div class="canvas-container">
+                  <canvas id="imageCanvas"></canvas>
+                </div>
+                <button class="download-btn" onclick="downloadImage('${preparedImage}')">Download</button>
+                <button class="color-btn" onclick="changeTextColor()">Change Text Color</button>
+                <script>
+                  const canvas = document.getElementById('imageCanvas');
+                  const context = canvas.getContext('2d');
+                  const img = new Image();
+                  img.src = '${preparedImage}';
+  
+                  let textColor = '${textColor}';
+                  let imageBrightness = ${await calculateImageBrightness({ src: { medium: preparedImage } })};
+  
+                  img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    context.drawImage(img, 0, 0);
+                    drawText();
+                  };
+  
+                  function drawText() {
+                    let fontSize = Math.max(canvas.width / 20, 20);
+                    let font = 'bold ' + fontSize + 'px Futura, Arial';
+                    
+                    context.font = font;
+                    context.fillStyle = textColor;
+                    context.textAlign = 'center';
+                    context.textBaseline = 'middle';
+                    
+                    const text = '"${quote.toUpperCase()}"';
+                    const textLines = wrapText(context, text, canvas.width * 0.9);
+                    const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
+  
+                    textLines.forEach((line, index) => {
+                      context.fillText(line, canvas.width / 2, textPosition.y + (index * (fontSize + 10)));
+                    });
+                  }
+  
+                  function changeTextColor() {
+                    const colors = ['white', 'black', 'red', 'blue', 'green'];
+                    textColor = colors[Math.floor(Math.random() * colors.length)];
+                    drawText();
+                  }
+  
+                  function downloadImage(url) {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = url.split('/').pop();
+                    a.click();
+                  }
+  
+                  function wrapText(context, text, maxWidth) {
+                    const words = text.split(' ');
+                    let line = '';
+                    const lines = [];
+  
+                    for (let i = 0; i < words.length; i++) {
+                      const testLine = line + words[i] + ' ';
+                      const metrics = context.measureText(testLine);
+                      const testWidth = metrics.width;
+  
+                      if (testWidth > maxWidth && i > 0) {
+                        lines.push(line);
+                        line = words[i] + ' ';
+                      } else {
+                        line = testLine;
+                      }
+                    }
+                    lines.push(line);
+  
+                    return lines;
+                  }
+  
+                  function getTextPosition(width, height, numberOfLines) {
+                    return {
+                      x: width / 2,
+                      y: height / 2 - (numberOfLines * 20) / 2
+                    };
+                  }
+                </script>
+              </body>
+            </html>
+          `);
+  
+          // Close the document to complete writing
+          newWindow.document.close();
+        } catch (error) {
+          console.error('Error opening new window:', error);
+        }
+      }
+    };
+  
+    openImageInNewWindow();
+  }, [preparedImage]);
+  
+  
+  
+  
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -54,83 +183,114 @@ const ImageGrid = () => {
     }
   };
 
-  // Function to open image in a new tab with Fabric.js canvas
+  const prepareImageWithText = async (image) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+
+    const imageBrightness = await calculateImageBrightness(image);
+
+    return new Promise((resolve) => {
+      img.onload = async () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0);
+
+        let fontSize = Math.max(canvas.width / 20, 20);
+        let font = `bold ${fontSize}px Futura, Arial`;
+
+        context.font = font;
+        context.fillStyle = getTextColor(imageBrightness);
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+
+        const text = `"${quote.toUpperCase()}"`;
+        const textLines = wrapText(context, text, canvas.width * 0.9);
+        const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
+
+        textLines.forEach((line, index) => {
+          context.fillText(line, canvas.width / 2, textPosition.y + (index * (fontSize + 10)));
+        });
+
+        const dataUrl = canvas.toDataURL('image/png');
+        resolve(dataUrl);
+      };
+
+      img.src = image.src.medium;
+    }).then((dataUrl) => {
+      setPreparedImage(dataUrl);
+    });
+  };
+
+  const calculateImageBrightness = (image) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0);
+
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        let r = 0, g = 0, b = 0, count = imageData.data.length / 4;
+
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          r += imageData.data[i];
+          g += imageData.data[i + 1];
+          b += imageData.data[i + 2];
+        }
+
+        r = r / count;
+        g = g / count;
+        b = b / count;
+
+        const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        resolve(brightness);
+      };
+
+      img.src = image.src.medium;
+    });
+  };
+
+  const getTextColor = (brightness) => {
+    return brightness < 128 ? 'white' : 'black';
+  };
+
+  const wrapText = (context, text, maxWidth) => {
+    const words = text.split(' ');
+    let line = '';
+    const lines = [];
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
+      const metrics = context.measureText(testLine);
+      const testWidth = metrics.width;
+
+      if (testWidth > maxWidth && i > 0) {
+        lines.push(line);
+        line = words[i] + ' ';
+      } else {
+        line = testLine;
+      }
+    }
+    lines.push(line);
+
+    return lines;
+  };
+
+  const getTextPosition = (width, height, numberOfLines) => {
+    return {
+      x: width / 2,
+      y: height / 2 - (numberOfLines * 20) / 2
+    };
+  };
+
   const openImageInNewTab = (index) => {
-    setCurrentIndex(index);
-    const imageUrl = images[index]?.src?.medium || '';
-    const quoteText = quote.replace(/'/g, "\\'"); // Escape single quotes for use in HTML
-
-    const newWindow = window.open('', '_blank');
-    newWindow.document.write(`
-      <html>
-        <head>
-          <title>Image Viewer</title>
-          <style>
-            body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
-            canvas { border: 1px solid #ccc; }
-          </style>
-          <script>
-            function loadFabric() {
-              return new Promise((resolve) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/6.3.0/fabric.min.js';
-                script.onload = () => resolve();
-                document.head.appendChild(script);
-              });
-            }
-
-            document.addEventListener('DOMContentLoaded', async () => {
-              await loadFabric();
-              const canvas = new fabric.Canvas('fabric-canvas');
-
-              fabric.Image.fromURL('${imageUrl}', (img) => {
-                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
-                canvas.setWidth(img.width);
-                canvas.setHeight(img.height);
-
-                const text = new fabric.Textbox('${quoteText}', {
-                  left: canvas.width / 2,
-                  top: canvas.height / 2,
-                  originX: 'center',
-                  originY: 'center',
-                  fontSize: 30,
-                  fill: '#fff',
-                  textAlign: 'center',
-                  selectable: true,
-                });
-
-                canvas.add(text);
-                text.setControlsVisibility({
-                  mt: true,
-                  mb: true,
-                  ml: true,
-                  mr: true,
-                  bl: true,
-                  br: true,
-                  tl: true,
-                  tr: true,
-                  mtr: true,
-                });
-
-                text.set({
-                  lockScalingFlip: true,
-                  cornerStyle: 'circle',
-                  cornerColor: 'blue',
-                  transparentCorners: false,
-                });
-
-                canvas.centerObject(text);
-                canvas.renderAll();
-              });
-            });
-          </script>
-        </head>
-        <body>
-          <canvas id="fabric-canvas" width="800" height="600"></canvas>
-        </body>
-      </html>
-    `);
-    newWindow.document.close(); // Close the document to finish writing
+    prepareImageWithText(images[index]);
   };
 
   return (
@@ -161,7 +321,6 @@ const ImageGrid = () => {
           </div>
         ))}
       </Masonry>
-      <canvas ref={canvasRef} style={{ display: 'none' }}></canvas>
     </div>
   );
 };
