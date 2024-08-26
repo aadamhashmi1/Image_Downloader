@@ -1,4 +1,3 @@
-// src/ImageGrid.js
 import React, { useState, useRef, useEffect } from 'react';
 import Masonry from 'react-masonry-css';
 import { searchImages } from './pexelsService';
@@ -16,7 +15,6 @@ const ImageGrid = () => {
   const [images, setImages] = useState([]);
   const [query, setQuery] = useState('');
   const [quote, setQuote] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [preparedImage, setPreparedImage] = useState(null);
 
   useEffect(() => {
@@ -26,22 +24,65 @@ const ImageGrid = () => {
           // Calculate the text color asynchronously
           const imageBrightness = await calculateImageBrightness({ src: { medium: preparedImage } });
           const textColor = getTextColor(imageBrightness);
-  
+
           // Open a new window and check if it was successful
           const newWindow = window.open('', '_blank');
           if (!newWindow) {
             console.error('Failed to open a new window. Please check your browser settings.');
             return;
           }
-  
-          // Write content to the new window
+
+          // Define a function to initialize Fabric.js and the canvas
+          const initCanvasScript = `
+            function initCanvas(canvasId, imageSrc, text, textColor) {
+              const canvas = new fabric.Canvas(canvasId);
+              fabric.Image.fromURL(imageSrc, (img) => {
+                const scaleFactor = Math.min(canvas.width / img.width, canvas.height / img.height);
+                img.scale(scaleFactor);
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                  originX: 'left',
+                  originY: 'top'
+                });
+
+                const textObj = new fabric.Text(text, {
+                  left: canvas.width / 2,
+                  top: canvas.height / 2,
+                  fontSize: 30,
+                  fill: textColor,
+                  originX: 'center',
+                  originY: 'center',
+                  hasControls: true,
+                  lockScalingFlip: true
+                });
+                canvas.add(textObj);
+                canvas.setActiveObject(textObj);
+
+                textObj.setControlsVisibility({
+                  mt: true,
+                  mb: true,
+                  ml: true,
+                  mr: true,
+                  bl: true,
+                  br: true,
+                  tl: true,
+                  tr: true,
+                  mtr: true
+                });
+
+                canvas.on('object:scaling', () => canvas.renderAll());
+                canvas.on('object:moving', () => canvas.renderAll());
+                canvas.on('object:rotating', () => canvas.renderAll());
+              }, { crossOrigin: 'Anonymous' });
+            }
+          `;
+
+          newWindow.document.open();
           newWindow.document.write(`
             <html>
               <head>
                 <title>Image Viewer</title>
                 <style>
                   body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
-                  .canvas-container { position: relative; }
                   canvas { max-width: 100%; max-height: 100%; }
                   .download-btn, .color-btn {
                     position: fixed;
@@ -57,105 +98,46 @@ const ImageGrid = () => {
                 </style>
               </head>
               <body>
-                <div class="canvas-container">
-                  <canvas id="imageCanvas"></canvas>
-                </div>
+                <canvas id="imageCanvas" width="800" height="600"></canvas>
                 <button class="download-btn" onclick="downloadImage('${preparedImage}')">Download</button>
                 <button class="color-btn" onclick="changeTextColor()">Change Text Color</button>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.0.2/fabric.min.js"></script>
                 <script>
-                  const canvas = document.getElementById('imageCanvas');
-                  const context = canvas.getContext('2d');
-                  const img = new Image();
-                  img.src = '${preparedImage}';
-  
-                  let textColor = '${textColor}';
-                  let imageBrightness = ${await calculateImageBrightness({ src: { medium: preparedImage } })};
-  
-                  img.onload = () => {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    context.drawImage(img, 0, 0);
-                    drawText();
-                  };
-  
-                  function drawText() {
-                    let fontSize = Math.max(canvas.width / 20, 20);
-                    let font = 'bold ' + fontSize + 'px Futura, Arial';
-                    
-                    context.font = font;
-                    context.fillStyle = textColor;
-                    context.textAlign = 'center';
-                    context.textBaseline = 'middle';
-                    
-                    const text = '"${quote.toUpperCase()}"';
-                    const textLines = wrapText(context, text, canvas.width * 0.9);
-                    const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
-  
-                    textLines.forEach((line, index) => {
-                      context.fillText(line, canvas.width / 2, textPosition.y + (index * (fontSize + 10)));
-                    });
-                  }
-  
-                  function changeTextColor() {
-                    const colors = ['white', 'black', 'red', 'blue', 'green'];
-                    textColor = colors[Math.floor(Math.random() * colors.length)];
-                    drawText();
-                  }
-  
+                  ${initCanvasScript}
+                  const imageSrc = '${preparedImage}';
+                  const text = "${quote.toUpperCase()}";
+                  const textColor = '${getTextColor(await calculateImageBrightness({ src: { medium: preparedImage } }))}';
+                  initCanvas('imageCanvas', imageSrc, text, textColor);
+
                   function downloadImage(url) {
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = url.split('/').pop();
                     a.click();
                   }
-  
-                  function wrapText(context, text, maxWidth) {
-                    const words = text.split(' ');
-                    let line = '';
-                    const lines = [];
-  
-                    for (let i = 0; i < words.length; i++) {
-                      const testLine = line + words[i] + ' ';
-                      const metrics = context.measureText(testLine);
-                      const testWidth = metrics.width;
-  
-                      if (testWidth > maxWidth && i > 0) {
-                        lines.push(line);
-                        line = words[i] + ' ';
-                      } else {
-                        line = testLine;
-                      }
-                    }
-                    lines.push(line);
-  
-                    return lines;
-                  }
-  
-                  function getTextPosition(width, height, numberOfLines) {
-                    return {
-                      x: width / 2,
-                      y: height / 2 - (numberOfLines * 20) / 2
-                    };
+
+                  function changeTextColor() {
+                    const colors = ['white', 'black', 'red', 'blue', 'green'];
+                    const canvas = window.fabric.Canvas.instances[0];
+                    const textObjects = canvas.getObjects('text');
+                    textObjects.forEach(text => {
+                      text.set({ fill: colors[Math.floor(Math.random() * colors.length)] });
+                    });
+                    canvas.renderAll();
                   }
                 </script>
               </body>
             </html>
           `);
-  
-          // Close the document to complete writing
           newWindow.document.close();
         } catch (error) {
           console.error('Error opening new window:', error);
         }
       }
     };
-  
+
     openImageInNewWindow();
   }, [preparedImage]);
-  
-  
-  
-  
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -289,10 +271,6 @@ const ImageGrid = () => {
     };
   };
 
-  const openImageInNewTab = (index) => {
-    prepareImageWithText(images[index]);
-  };
-
   return (
     <div>
       <form onSubmit={handleSearch}>
@@ -315,7 +293,7 @@ const ImageGrid = () => {
             <img
               src={image.src.medium}
               alt={`img-${index}`}
-              onClick={() => openImageInNewTab(index)}
+              onClick={() => prepareImageWithText(image)}
               style={{ cursor: 'pointer' }}
             />
           </div>
