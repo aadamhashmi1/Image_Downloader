@@ -1,10 +1,4 @@
-// Import your required dependencies (if any)
-
-
-
-
-
-// Fetch a random quote from the API Ninjas API
+// src/quoteService.js
 export const fetchRandomQuote = async () => {
   try {
     const response = await fetch('https://api.api-ninjas.com/v1/quotes', {
@@ -16,7 +10,6 @@ export const fetchRandomQuote = async () => {
 
     const data = await response.json();
 
-    // Ensure the response contains at least one quote
     if (data && data.length > 0) {
       return data[0].quote;
     } else {
@@ -27,28 +20,3 @@ export const fetchRandomQuote = async () => {
     return 'Life is beautiful'; // Fallback quote if the API fails
   }
 };
-
-// Extract meaningful keywords from the quote
-export const extractKeywords = (quote) => {
-  const stopWords = new Set([
-    'the', 'and', 'a', 'to', 'in', 'of', 'for', 'on', 'with', 'is', 'it', 'this', 'that', 'at', 'as', 'by', 'an', 'are'
-  ]);
-
-  // Process the quote to extract keywords
-  const words = quote
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, '') // Remove punctuation
-    .split(/\s+/) // Split by whitespace
-    .filter(word => word.length > 3 && !stopWords.has(word)) // Filter short words and stop words
-    .reduce((acc, word) => {
-      if (!acc.includes(word)) acc.push(word);
-      return acc;
-    }, [])
-    .slice(0, 3) // Take the top 3 words
-    .join(' '); // Join them into a single string
-
-  return words;
-};
-
-
-

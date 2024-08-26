@@ -1,3 +1,4 @@
+// src/pexelsService.js
 import axios from 'axios';
 
 const API_KEY = 'uVktvfZdjycLoNDU8HGlu633wvCVGRKJk7kfxqXrFtBwOpxGVAYNQsbg';
