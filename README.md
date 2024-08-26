@@ -16,8 +16,6 @@ This React application allows users to search for images, generate random quotes
 ### Image Grid
 ![Image Grid](screenshots/grid.png)
 
-### Quote Overlay
-![Quote Overlay](screenshots/quote-overlay.png)
 
 ### Interactive Text Handles
 ![Interactive Text Handles](screenshots/text-handles.png)
