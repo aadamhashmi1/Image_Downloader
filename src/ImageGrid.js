@@ -20,178 +20,234 @@ const ImageGrid = () => {
 
   useEffect(() => {
     const openImageInNewWindow = async () => {
-        if (preparedImage) {
-            try {
-                const imageBrightness = await calculateImageBrightness({ src: { medium: preparedImage } });
-                const textColor = getTextColor(imageBrightness);
-
-                const textPosition = { x: 100, y: 100 }; // Default text position
-                const textSize = { width: 200, height: 50 }; // Default text size
-
-                const newWindow = window.open('', '_blank');
-                if (!newWindow) {
-                    console.error('Failed to open a new window. Please check your browser settings.');
-                    return;
+      if (preparedImage) {
+        try {
+          // Calculate image brightness and determine text color
+          const imageBrightness = await calculateImageBrightness({ src: { medium: preparedImage } });
+          const textColor = getTextColor(imageBrightness);
+      
+          // Open a new window
+          const newWindow = window.open('', '_blank');
+          if (!newWindow) {
+            console.error('Failed to open a new window. Please check your browser settings.');
+            return;
+          }
+      
+          // Write HTML content to the new window
+          newWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Image Viewer</title>
+              <style>
+                body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
+                .canvas-container { position: relative; }
+                canvas { max-width: 100%; max-height: 100%; }
+                .handle { 
+                  position: absolute; 
+                  width: 20px; 
+                  height: 20px; 
+                  background-color: rgba(255, 255, 255, 0.8); 
+                  border: 1px solid #000; 
+                  cursor: pointer; 
                 }
+                .handle-tl { top: 10px; left: 10px; cursor: nw-resize; }
+                .handle-tr { top: 10px; right: 10px; cursor: ne-resize; }
+                .handle-bl { bottom: 10px; left: 10px; cursor: sw-resize; }
+                .handle-br { bottom: 10px; right: 10px; cursor: se-resize; }
+                .download-btn, .color-btn { 
+                  position: fixed; 
+                  top: 10px; 
+                  background-color: #fff; 
+                  padding: 5px 10px; 
+                  border: none; 
+                  cursor: pointer; 
+                  z-index: 1; 
+                }
+                .download-btn { right: 10px; }
+                .color-btn { right: 120px; }
+              </style>
+            </head>
+            <body>
+              <div class="canvas-container">
+                <canvas id="imageCanvas"></canvas>
+                <div id="handle-tl" class="handle"></div>
+                <div id="handle-tr" class="handle"></div>
+                <div id="handle-bl" class="handle"></div>
+                <div id="handle-br" class="handle"></div>
+              </div>
+              <button class="download-btn" onclick="downloadImage()">Download</button>
+              <button class="color-btn" onclick="changeTextColor()">Change Text Color</button>
+              <script>
+                const canvas = document.getElementById('imageCanvas');
+                const context = canvas.getContext('2d');
+                const img = new Image();
+                img.src = '${preparedImage}';
+                
+                let textColor = '${textColor}';
+                let textX = canvas.width / 2;
+                let textY = canvas.height / 2;
+                let fontSize = Math.max(canvas.width / 20, 20);
+                const textHandleTl = document.getElementById('handle-tl');
+                const textHandleTr = document.getElementById('handle-tr');
+                const textHandleBl = document.getElementById('handle-bl');
+                const textHandleBr = document.getElementById('handle-br');
+      
+                img.onload = () => {
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  drawText();
+                };
+      
+                function drawText() {
+                  context.clearRect(0, 0, canvas.width, canvas.height);
+                  context.drawImage(img, 0, 0);
+      
+                  const font = \`bold \${fontSize}px Futura, Arial\`;
+                  context.font = font;
+                  context.fillStyle = textColor;
+                  context.textAlign = 'center';
+                  context.textBaseline = 'middle';
+      
+                  const text = '"${quote.toUpperCase()}"';
+                  const textLines = wrapText(context, text, canvas.width * 0.9);
+                  const textPosition = getTextPosition(canvas.width, canvas.height, textLines.length);
+      
+                  textLines.forEach((line, index) => {
+                    context.fillText(line, textX, textY + (index * (fontSize + 10)));
+                  });
+      
+                  // Update handle positions
+                  updateHandles(textPosition, textLines.length, fontSize);
+                }
+      
+                function updateHandles(textPosition, numberOfLines, fontSize) {
+                  const textBoxWidth = canvas.width * 0.9;
+                  const textBoxHeight = (fontSize + 10) * numberOfLines;
+      
+                  textHandleTl.style.top = \`\${textPosition.y - textBoxHeight / 2}px\`;
+                  textHandleTl.style.left = \`\${textPosition.x - textBoxWidth / 2}px\`;
+      
+                  textHandleTr.style.top = \`\${textPosition.y - textBoxHeight / 2}px\`;
+                  textHandleTr.style.left = \`\${textPosition.x + textBoxWidth / 2 - 20}px\`;
+      
+                  textHandleBl.style.top = \`\${textPosition.y + textBoxHeight / 2 - 20}px\`;
+                  textHandleBl.style.left = \`\${textPosition.x - textBoxWidth / 2}px\`;
+      
+                  textHandleBr.style.top = \`\${textPosition.y + textBoxHeight / 2 - 20}px\`;
+                  textHandleBr.style.left = \`\${textPosition.x + textBoxWidth / 2 - 20}px\`;
+                }
+      
+                function changeTextColor() {
+                  const colors = ['white', 'black', 'red', 'blue', 'green'];
+                  textColor = colors[Math.floor(Math.random() * colors.length)];
+                  drawText();
+                }
+      
+                function downloadImage() {
+                  const dataURL = canvas.toDataURL('image/png');
+                  const a = document.createElement('a');
+                  a.href = dataURL;
+                  a.download = 'image.png';
+                  a.click();
+                }
+      
+                function wrapText(context, text, maxWidth) {
+                  const words = text.split(' ');
+                  let line = '';
+                  const lines = [];
+      
+                  for (let i = 0; i < words.length; i++) {
+                    const testLine = line + words[i] + ' ';
+                    const metrics = context.measureText(testLine);
+                    const testWidth = metrics.width;
+      
+                    if (testWidth > maxWidth && i > 0) {
+                      lines.push(line);
+                      line = words[i] + ' ';
+                    } else {
+                      line = testLine;
+                    }
+                  }
+                  lines.push(line);
+      
+                  return lines;
+                }
+      
+                function getTextPosition(width, height, numberOfLines) {
+                  return {
+                    x: width / 2,
+                    y: height / 2 - (numberOfLines * 20) / 2
+                  };
+                }
+      
+                function onMouseMove(e, handle) {
+  const sensitivity = 0.05; // Adjust this factor to control sensitivity
+  const rect = canvas.getBoundingClientRect();
+  
+  let newWidth, newHeight;
+  let xOffset = e.clientX - rect.left;
+  let yOffset = e.clientY - rect.top;
 
-                newWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <title>Image Viewer</title>
-                      <style>
-                        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
-                        .canvas-container { position: relative; }
-                        canvas { max-width: 100%; max-height: 100%; }
-                        .control {
-                          position: absolute;
-                          width: 10px;
-                          height: 10px;
-                          background-color: #fff;
-                          border: 1px solid #000;
-                          cursor: pointer;
-                        }
-                        .download-btn, .color-btn {
-                          position: fixed;
-                          top: 10px;
-                          background-color: #fff;
-                          padding: 5px 10px;
-                          border: none;
-                          cursor: pointer;
-                          z-index: 1;
-                        }
-                        .download-btn { right: 10px; }
-                        .color-btn { right: 120px; }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="canvas-container">
-                        <canvas id="imageCanvas"></canvas>
-                        <div id="handle-tl" class="control" style="top: 0px; left: 0px;"></div>
-                        <div id="handle-tr" class="control" style="top: 0px; right: 0px;"></div>
-                        <div id="handle-bl" class="control" style="bottom: 0px; left: 0px;"></div>
-                        <div id="handle-br" class="control" style="bottom: 0px; right: 0px;"></div>
-                      </div>
-                      <button class="download-btn" onclick="downloadImage()">Download</button>
-                      <button class="color-btn" onclick="changeTextColor()">Change Text Color</button>
-                      <script>
-                        const canvas = document.getElementById('imageCanvas');
-                        const context = canvas.getContext('2d');
-                        const img = new Image();
-                        img.src = '${preparedImage}';
+  if (handle === 'tl') {
+    newWidth = canvas.width - (xOffset - textX) * sensitivity;
+    newHeight = canvas.height - (yOffset - textY) * sensitivity;
+    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
+    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
+    textX = xOffset + (canvas.width / 2);
+    textY = yOffset + (canvas.height / 2);
+  } else if (handle === 'tr') {
+    newWidth = (xOffset - textX) * sensitivity;
+    newHeight = canvas.height - (yOffset - textY) * sensitivity;
+    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
+    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
+    textY = yOffset + (canvas.height / 2);
+  } else if (handle === 'bl') {
+    newWidth = canvas.width - (xOffset - textX) * sensitivity;
+    newHeight = (yOffset - textY) * sensitivity;
+    canvas.width = Math.max(newWidth, 5); // Ensure minimum width
+    canvas.height = Math.max(newHeight, 5); // Ensure minimum height
+    textX = xOffset + (canvas.width / 2);
+  } else if (handle === 'br') {
+    newWidth = (xOffset - textX) * sensitivity;
+    newHeight = (yOffset - textY) * sensitivity;
+    canvas.width = Math.max(newWidth, 6); // Ensure minimum width
+    canvas.height = Math.max(newHeight, 6); // Ensure minimum height
+  }
 
-                        let textColor = '${textColor}';
-                        let textX = ${textPosition.x};
-                        let textY = ${textPosition.y};
-                        let textWidth = ${textSize.width};
-                        let textHeight = ${textSize.height};
+  drawText();
+}
 
-                        const handleTL = document.getElementById('handle-tl');
-                        const handleTR = document.getElementById('handle-tr');
-                        const handleBL = document.getElementById('handle-bl');
-                        const handleBR = document.getElementById('handle-br');
-
-                        img.onload = () => {
-                          canvas.width = img.width;
-                          canvas.height = img.height;
-                          drawText();
-                          positionHandles();
-                        };
-
-                        function drawText() {
-                          context.clearRect(0, 0, canvas.width, canvas.height);
-                          context.drawImage(img, 0, 0);
-
-                          const fontSize = Math.max(textWidth / 10, 20);
-                          context.font = 'bold ' + fontSize + 'px Futura, Arial';
-                          context.fillStyle = textColor;
-                          context.textAlign = 'center';
-                          context.textBaseline = 'middle';
-
-                          context.fillText("${quote.toUpperCase()}", textX + textWidth / 2, textY + textHeight / 2);
-                        }
-
-                        function changeTextColor() {
-                          const colors = ['white', 'black', 'red', 'blue', 'green'];
-                          textColor = colors[Math.floor(Math.random() * colors.length)];
-                          drawText();
-                        }
-
-                        function downloadImage() {
-                          const dataURL = canvas.toDataURL('image/png');
-                          const a = document.createElement('a');
-                          a.href = dataURL;
-                          a.download = 'image.png';
-                          a.click();
-                        }
-
-                        function positionHandles() {
-                          handleTL.style.left = textX + 'px';
-                          handleTL.style.top = textY + 'px';
-
-                          handleTR.style.left = textX + textWidth - 10 + 'px';
-                          handleTR.style.top = textY + 'px';
-
-                          handleBL.style.left = textX + 'px';
-                          handleBL.style.top = textY + textHeight - 10 + 'px';
-
-                          handleBR.style.left = textX + textWidth - 10 + 'px';
-                          handleBR.style.top = textY + textHeight - 10 + 'px';
-                        }
-
-                        function onMouseMove(e) {
-                          if (e.target === handleTL) {
-                            textX = e.clientX - canvas.getBoundingClientRect().left;
-                            textY = e.clientY - canvas.getBoundingClientRect().top;
-                            textWidth += handleBR.getBoundingClientRect().left - e.clientX;
-                            textHeight += handleBR.getBoundingClientRect().top - e.clientY;
-                          } else if (e.target === handleTR) {
-                            textY = e.clientY - canvas.getBoundingClientRect().top;
-                            textWidth = e.clientX - canvas.getBoundingClientRect().left - textX;
-                            textHeight += handleBR.getBoundingClientRect().top - e.clientY;
-                          } else if (e.target === handleBL) {
-                            textX = e.clientX - canvas.getBoundingClientRect().left;
-                            textWidth += handleBR.getBoundingClientRect().left - e.clientX;
-                            textHeight = e.clientY - canvas.getBoundingClientRect().top - textY;
-                          } else if (e.target === handleBR) {
-                            textWidth = e.clientX - canvas.getBoundingClientRect().left - textX;
-                            textHeight = e.clientY - canvas.getBoundingClientRect().top - textY;
-                          }
-                          drawText();
-                          positionHandles();
-                        }
-
-                        handleTL.addEventListener('mousedown', () => {
-                          document.addEventListener('mousemove', onMouseMove);
-                        });
-                        handleTR.addEventListener('mousedown', () => {
-                          document.addEventListener('mousemove', onMouseMove);
-                        });
-                        handleBL.addEventListener('mousedown', () => {
-                          document.addEventListener('mousemove', onMouseMove);
-                        });
-                        handleBR.addEventListener('mousedown', () => {
-                          document.addEventListener('mousemove', onMouseMove);
-                        });
-
-                        document.addEventListener('mouseup', () => {
-                          document.removeEventListener('mousemove', onMouseMove);
-                        });
-                      </script>
-                    </body>
-                    </html>
-                `);
-
-                newWindow.document.close();
-            } catch (error) {
-                console.error('Error opening new window:', error);
-            }
+      
+                function onHandleMouseDown(e, handle) {
+                  document.addEventListener('mousemove', (moveEvent) => onMouseMove(moveEvent, handle));
+                  document.addEventListener('mouseup', onHandleMouseUp);
+                }
+      
+                function onHandleMouseUp() {
+                  document.removeEventListener('mousemove', onMouseMove);
+                  document.removeEventListener('mouseup', onHandleMouseUp);
+                }
+      
+                textHandleTl.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'tl'));
+                textHandleTr.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'tr'));
+                textHandleBl.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'bl'));
+                textHandleBr.addEventListener('mousedown', (e) => onHandleMouseDown(e, 'br'));
+              </script>
+            </body>
+            </html>
+          `);
+      
+          newWindow.document.close();
+        } catch (error) {
+          console.error('Error opening new window:', error);
         }
+      }
     };
-
+  
     openImageInNewWindow();
-}, [preparedImage]);
-
+  }, [preparedImage, quote]);
+  
   
   
   

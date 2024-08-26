@@ -1,6 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+canvas { 
+  max-width: 100%; 
+  max-height: 100%; 
+}
+
 .my-masonry-grid {
   display: flex;
   margin-left: -30px; /* gutter size offset */

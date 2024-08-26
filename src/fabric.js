@@ -1,28 +1,47 @@
-import * as fabric from 'fabric';
-// Initialize Fabric.js canvas
-export const initCanvas = (canvasId, imageSrc, text) => {
-  const canvas = new fabric.Canvas(canvasId);
-  
-  fabric.Image.fromURL(imageSrc, (img) => {
+loadFabricScript(function() {
+  console.log('Fabric.js loaded');
+  const canvas = new fabric.Canvas('c');
+  console.log('Canvas initialized');
+
+  const img = new Image();
+  img.crossOrigin = 'Anonymous'; // Ensure CORS if needed
+  img.src = 'https://via.placeholder.com/600x400'; // Static image URL
+  console.log('Image source set');
+
+  img.onload = () => {
+    console.log('Image loaded');
     canvas.setWidth(img.width);
     canvas.setHeight(img.height);
-    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+    const fabricImage = new fabric.Image(img);
+    canvas.add(fabricImage);
     
-    const fabricText = new fabric.Text(text, {
-      left: 50,
-      top: 50,
+    const text = new fabric.Textbox('${quote.toUpperCase()}', {
+      left: canvas.width / 2,
+      top: canvas.height / 2,
+      fill: '${textColor}',
       fontSize: 30,
-      fill: 'white',
       originX: 'center',
       originY: 'center',
-      hasControls: true,
-      lockRotation: false,
+      editable: true
     });
+    canvas.add(text);
+    canvas.setActiveObject(text);
+  };
 
-    canvas.add(fabricText);
+  img.onerror = () => { console.error('Failed to load the image.'); };
 
-    canvas.on('object:modified', () => {
-      // Optional: Handle events when the object is modified
-    });
-  });
-};
+  window.changeTextColor = function() {
+    const colors = ['white', 'black', 'red', 'blue', 'green'];
+    const newColor = colors[Math.floor(Math.random() * colors.length)];
+    canvas.getActiveObject().set('fill', newColor);
+    canvas.requestRenderAll();
+  };
+
+  window.downloadImage = function() {
+    const dataURL = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = 'image.png';
+    a.click();
+  };
+});
