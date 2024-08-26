@@ -11,6 +11,18 @@ This React application allows users to search for images, generate random quotes
 - **Interactive Text Handle**: When the text is clicked, a handle appears to help adjust its position. The handle disappears after one second when the cursor is not on the text.
 - **Download Image**: The image with the overlayed text can be downloaded.
 
+## Screenshots
+
+### Image Grid
+![Image Grid](screenshots/grid.png)
+
+### Quote Overlay
+![Quote Overlay](screenshots/quote-overlay.png)
+
+### Interactive Text Handles
+![Interactive Text Handles](screenshots/text-handles.png)
+
+
 ## Installation
 
 ### Prerequisites

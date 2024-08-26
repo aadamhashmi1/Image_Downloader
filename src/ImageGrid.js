@@ -148,8 +148,8 @@ const ImageGrid = () => {
                     textX = e.clientX - rect.left;
                     textY = e.clientY - rect.top;
                     drawText();
-                    textHandle.style.left = \`\${textX - 10}px\`;
-                    textHandle.style.top = \`\${textY - 10}px\`;
+                    textHandle.style.left = \`\${textX - 5}px\`;
+                    textHandle.style.top = \`\${textY - 5}px\`;
                   }
                 }
     
